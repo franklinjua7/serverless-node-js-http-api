@@ -1,28 +1,51 @@
+const { v4 } = require('uuid')
 const AWS = require('aws-sdk');
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+const TableNameAlmacenar = 'AlmacenarTable';
 
 const almacenar = async (event) => {
+    const id = v4();
+    
+    // Parseando el cuerpo del evento
+    let data = {}
+    try {
+        data = JSON.parse(event.body);
+    } catch (error) {
+        console.error('Error parsing JSON body:', error);
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: 'Invalid JSON' })
+        };
+    }
 
-    const dynamodb = new AWS.DynamoDB.DocumentClient();
-    const { characterName, planeta, climate } = JSON.parse(event.body);
-    const timestamp = Math.floor(new Date().getTime()/1000.0);
+    const { characterName, planet, climate } = JSON.parse(event.body);
 
-    const data_almacenar = {
-        characterName,
-        timestamp,
-        climate,
-        planeta
+    // Añadiendo id,timestamp
+    data.id = v4();
+    data.timestamp = Math.floor(new Date().getTime() / 1000.0);
+
+    // Preparando los datos para almacenar en DynamoDB
+    const params = {
+        TableName: TableNameAlmacenar,
+        Item: data
     };
+    console.log('Data almacenar: ', params);
 
-    console.log('Data almacenar: ', data_almacenar);
 
-    await dynamodb.put({
-        TableName: 'RetoTecnicoTable',
-        Item: data_almacenar
-    }).promise();
+    try {
+        // Guardando los datos en DynamoDB
+        await dynamodb.put(params).promise();
 
-    return {
-        status: 200,
-        body : JSON.stringify(data_almacenar)
+        return {
+            statusCode: 200,
+            body: JSON.stringify(data)
+        };
+    } catch (error) {
+        console.error('Error al guardar en DynamoDB:', error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Error al guardar en DynamoDB' })
+        };
     }
 }
 

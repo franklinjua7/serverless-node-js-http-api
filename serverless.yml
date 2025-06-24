@@ -9,45 +9,52 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: us-east-1
+  memorySize: 128 # Es el valor mínimo y el máxomo es 10 GB
+  timeout: 5
   iamRoleStatements:
     - Effect: Allow
       Action: 
         - dynamodb:*
       Resource: 
-        - arn:aws:dynamodb:us-east-1:311141537249:table/RetoTecnicoTable
+        - arn:aws:dynamodb:us-east-1:311141537249:table/AlmacenarTable
+        - arn:aws:dynamodb:us-east-1:311141537249:table/FusionadosTable
+        - arn:aws:dynamodb:us-east-1:311141537249:table/TempCharactersTable
+        - arn:aws:dynamodb:us-east-1:311141537249:table/TempPlanetsTable
 
 functions:
   hello:
     handler: handler.hello
     events:
-      - httpApi:
+      - http: 
           path: /
           method: get
   getFusionados:
     handler: src/fusionados.fusionados
     events:
-      - httpApi:
+      - http:
           path: /fusionados
           method: get
   postAlmacenar:
     handler: src/almacenar.almacenar
     events:
-      - httpApi:
+      - http:
           path: /almacenar
           method: post
   getHistorial:
+    timeout: 10
     handler: src/historial.historial
     events:
-      - httpApi:
+      - http:
           path: /historial
           method: get
 
 resources:
   Resources:
-    Table:
+    # First DynamoDB Table
+    FirstTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: RetoTecnicoTable
+        TableName: FusionadosTable
         AttributeDefinitions:
           - AttributeName: characterName
             AttributeType: S
@@ -61,3 +68,62 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
+        #TimeToLiveSpecification:
+        #    AttributeName: timeToLive
+        #    Enabled: true
+    # Second DynamoDB Table
+    SecondTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: AlmacenarTable
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType:  HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    # Tercera DynamoDB Table
+    ThirdTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: TempPlanetsTable
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: N
+          #- AttributeName: ttlAttribute
+          #  AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          #- AttributeName: ttlAttribute
+          #  KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TimeToLiveSpecification:
+          Enabled: true
+          AttributeName: ttlAttribute
+    # Fourth DynamoDB Table
+    FourthTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: TempCharactersTable
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: N
+          #- AttributeName: ttlAttribute
+          #  AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          #- AttributeName: ttlAttribute
+          #  KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TimeToLiveSpecification:
+          Enabled: true
+          AttributeName: ttlAttribute
