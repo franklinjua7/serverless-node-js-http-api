@@ -1,10 +1,10 @@
 const { v4 } = require('uuid')
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TableNameAlmacenar = 'AlmacenarTable';
 
 // Definir región (por ejemplo us-east-1)
+const AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
+const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 const almacenar = async (event) => {
     const id = v4();
@@ -20,8 +20,6 @@ const almacenar = async (event) => {
             body: JSON.stringify({ error: 'Invalid JSON' })
         };
     }
-
-    const { characterName, planet, climate } = JSON.parse(event.body);
 
     // Añadiendo id,timestamp
     data.id = v4();
