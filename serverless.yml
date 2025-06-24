@@ -8,6 +8,13 @@ service: reto-aws-nodejs20-http-api
 provider:
   name: aws
   runtime: nodejs20.x
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action: 
+        - dynamodb:*
+      Resource: 
+        - arn:aws:dynamodb:us-east-1:311141537249:table/RetoTecnicoTable
 
 functions:
   hello:
@@ -16,3 +23,41 @@ functions:
       - httpApi:
           path: /
           method: get
+  getFusionados:
+    handler: src/fusionados.fusionados
+    events:
+      - httpApi:
+          path: /fusionados
+          method: get
+  postAlmacenar:
+    handler: src/almacenar.almacenar
+    events:
+      - httpApi:
+          path: /almacenar
+          method: post
+  getHistorial:
+    handler: src/historial.historial
+    events:
+      - httpApi:
+          path: /historial
+          method: get
+
+resources:
+  Resources:
+    Table:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: RetoTecnicoTable
+        AttributeDefinitions:
+          - AttributeName: characterName
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: characterName
+            KeyType: HASH
+          - AttributeName: timestamp
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
