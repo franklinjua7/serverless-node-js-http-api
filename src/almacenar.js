@@ -3,6 +3,9 @@ const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TableNameAlmacenar = 'AlmacenarTable';
 
+// Definir región (por ejemplo us-east-1)
+AWS.config.update({ region: 'us-east-1' });
+
 const almacenar = async (event) => {
     const id = v4();
     

@@ -1,99 +1,99 @@
 const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
-const TableNameFusionados = 'FusionadosTable';
+
+const TABLE_FUSIONADOS = 'FusionadosTable';
+const TABLE_PLANETS = 'TempPlanetsTable';
+const TABLE_CHARACTERS = 'TempCharactersTable';
+const TTL_SECONDS = 30 * 60; // 30 minutos
+
+const getRandomId = (max) => Math.floor(Math.random() * max) + 1;
+
+const getItemFromDynamo = async (tableName, id) => {
+    const result = await dynamodb.get({ TableName: tableName, Key: { id } }).promise();
+    return result.Item || null;
+};
+
+const fetchAndCacheItem = async (url, tableName, id) => {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`Fetch failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    data.id = id;
+    data.ttlAttribute = Math.floor(Date.now() / 1000) + TTL_SECONDS;
+
+    await dynamodb.put({ TableName: tableName, Item: data }).promise();
+    return data;
+};
 
 const fusionados = async (event) => {
-    random_planeta = Math.floor(Math.random() * 60) + 1;
-    random_persona = Math.floor(Math.random() * 83) + 1;
-    console.debug('RandomPlaneta: ',random_planeta);
-    console.debug('RandomPersona: ',random_persona);
+    const randomPlanetId = getRandomId(60);
+    const randomCharacterId = getRandomId(83);
+
+    console.debug('Random Planet ID:', randomPlanetId);
+    console.debug('Random Character ID:', randomCharacterId);
 
     try {
-        // Obtenemos los DATOS de los PLANETAS
-        const temp_response_planeta = await dynamodb.get({
-            TableName: 'TempPlanetsTable', Key: { id: random_planeta}
-        }).promise();
-
-        // Verificamos la DATA de PLANETA
-        console.debug('Temp Response Planeta: ',temp_response_planeta);
-        if ( Object.keys(temp_response_planeta).length === 0 ){
-            // Obtenemos NUEVA data
-            const reponse_planeta = await fetch('https://swapi.info/api/planets/'+random_planeta);
-            if (!reponse_planeta.ok){
-                throw new Error(`Error en la solicitud: ${reponse_planeta.status}`);
-            }
-            data_planeta = await reponse_planeta.json();
-            console.debug('Datos planeta: ', data_planeta);
-
-            // Almacenamos la NUEVA data
-            data_planeta.id = random_planeta;
-            data_planeta.ttlAttribute = Math.floor(new Date().getTime() / 1000.0) + (30 *60)
-            await dynamodb.put({
-                TableName: 'TempPlanetsTable', Item: data_planeta
-            }).promise();
+        // PLANETA
+        let planeta = await getItemFromDynamo(TABLE_PLANETS, randomPlanetId);
+        if (!planeta) {
+            console.debug(`Cache miss for planet ID: ${randomPlanetId}`);
+            planeta = await fetchAndCacheItem(
+                `https://swapi.info/api/planets/${randomPlanetId}`,
+                TABLE_PLANETS,
+                randomPlanetId
+            );
         } else {
-            data_planeta = temp_response_planeta.Item;
-            console.debug('Datos planeta temp: ', data_planeta);
+            console.debug('Cached Planet:', planeta);
         }
-        console.log('Datos Planeta Final: ', data_planeta);
 
-        // Obtenemos los DATOS de los PERSONAJES
-        const temp_response_character = await dynamodb.get({
-            TableName: 'TempCharactersTable', Key: { id: random_persona }
-        }).promise();
-
-        // Verificar la DATA de CHARACTERES
-        console.debug('Temp Response Character', temp_response_character);
-        if ( Object.keys(temp_response_character).length === 0 ){
-            // Obtenemos NUEVA data
-            const response_persona = await fetch('https://swapi.info/api/people/'+random_persona);
-            if (!response_persona.ok){
-                throw new Error(`Error en la solicitud: ${response_persona.status}`);
-            }
-            data_persona = await response_persona.json();
-            console.log('Datos persona: ', data_persona);
-
-            // Almacenamos la NUEVA data
-            data_persona.id = random_persona;
-            data_persona.ttlAttribute = Math.floor(new Date().getTime() / 1000.0) + (30 *60)
-            await dynamodb.put({
-                TableName: 'TempCharactersTable', Item: data_persona
-            }).promise();
+        // PERSONAJE
+        let personaje = await getItemFromDynamo(TABLE_CHARACTERS, randomCharacterId);
+        if (!personaje) {
+            console.debug(`Cache miss for character ID: ${randomCharacterId}`);
+            personaje = await fetchAndCacheItem(
+                `https://swapi.info/api/people/${randomCharacterId}`,
+                TABLE_CHARACTERS,
+                randomCharacterId
+            );
         } else {
-            data_persona = temp_response_character.Item;
-            console.debug('Datos persona temp: ', data_persona);
+            console.debug('Cached Character:', personaje);
         }
-        console.log('Datos Persona Final: ', data_persona);
 
-        // Armamos el ARRAY final
-        data_fusionada={
-            'characterName': data_persona['name'],
-            'timestamp': Math.floor(new Date().getTime()/1000.0),
-            'planet': data_planeta['name'],
-            'climate': data_planeta['climate']
-        }
-        console.debug('Data Fusionada: ',data_fusionada);
+        // FUSIÓN
+        const fusionData = {
+            characterName: personaje.name,
+            timestamp: Math.floor(new Date().getTime()/1000.0),
+            planet: planeta.name,
+            climate: planeta.climate,
+        };
+
+        console.debug('Fusion Data:', fusionData);
 
         await dynamodb.put({
-            TableName: TableNameFusionados,
-            Item: data_fusionada
+            TableName: TABLE_FUSIONADOS,
+            Item: fusionData,
         }).promise();
 
         return {
             statusCode: 200,
-            body: JSON.stringify(data_fusionada)
+            body: JSON.stringify(fusionData),
         };
 
     } catch (error) {
-        console.error(`Error al obtener: `, error);
-        //throw error;
+        console.error('Error in fusionados:', error);
+
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Error al procesar los datos.'})
-        }
+            body: JSON.stringify({ error: 'Internal server error.' }),
+        };
     }
-}
+};
 
 module.exports = {
-    fusionados
-}
+    fusionados,
+    getItemFromDynamo, // exportables para pruebas unitarias
+    fetchAndCacheItem, // exportables para pruebas unitarias
+};
